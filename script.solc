@@ -1,0 +1,115 @@
+// SPDX-License-Identifier: CC-BY-4.0
+// Version of Solidity compiler this program was written for
+pragma solidity ^0.8.0;
+
+// The contract do be deployed
+contract AdvancedFaucet {
+
+    // The address of the owner is kept private, no one needs to know it. It is given as input
+    // to the constructor.
+    address private owner;
+
+    // The array to hold the charities' addresses, private as requested
+    address[] private charities;
+    
+    // The constructor of the contract, takes as input the charities addresses and the owner's
+    // address (the owner will probably be the deployer of the contract)
+    constructor (address[] memory charities_input, address owner_input) {
+        charities = charities_input;
+        owner = owner_input;
+    }
+
+    // Variables to store the max donation, best donator and total donation amounts
+    uint256 private totalWeiDonated = 0;
+    address private maxDonator;
+    uint256 private maxDonationWei = 0;
+
+    // Getter for the total donation amount (in wei)
+    function getTotalDonations() public view returns(uint256) {
+        return totalWeiDonated;
+    }
+
+    // Getter for the best donator, available to the owner of the contract
+    function getMaxDonator() public view returns(address) {
+        if (msg.sender == owner) {
+            return maxDonator;
+        } else {
+            // if not called by the owner, return a zero addess
+            return address(0);
+        }
+    }
+    
+    // Getter for the max donation, also available to the owner of the contract
+    function getMaxDonation() public view returns(uint256) {
+        if (msg.sender == owner) {
+            return maxDonationWei;
+        } else {
+        // if not called by the owner, return zero
+            return 0;
+        }
+    }
+
+    // Event to be emitted on new donation high score
+    event DonationHighScore(address _from, uint256 _value);
+    
+    // first transaction function, takes as input the address to send the money and the
+    // charity index (msg values are set through the web3 call)
+    function doTransaction(address toAddress, uint charityIndex) external payable {
+        // 90% of the money goes to recipient, rest to charity
+        uint256 toPay = 9*msg.value/10;
+        uint256 toCharity = msg.value - toPay;
+
+        // checks
+        assert(charityIndex>=0 && charityIndex<2);
+        assert(msg.sender.balance >= msg.value);
+        
+        // sending the money
+        (bool sent1, bytes memory data1) = toAddress.call{value: toPay}("");
+        require(sent1, "Failed to send Ether");
+        
+        (bool sent2, bytes memory data2) = charities[charityIndex].call{value: toCharity}("");
+        require(sent2, "Failed to send Ether");
+
+        // update total wei, check if high score
+        totalWeiDonated = toCharity + totalWeiDonated;
+        if (toCharity>maxDonationWei) {
+            maxDonationWei = toCharity;
+            maxDonator = msg.sender;
+            emit DonationHighScore(msg.sender, toCharity);
+        }
+    }
+    
+    // second transaction function, this also takes the amount of wei for charity)
+    function doTransaction(address toAddress, uint charityIndex, uint weiToCharity) external payable {
+        // amounts to pay
+        uint256 toPay = msg.value-weiToCharity;
+        uint256 toCharity = weiToCharity;
+        
+        // checks
+        assert(charityIndex>=0 && charityIndex<2);
+        assert(msg.sender.balance >= msg.value);
+        assert(toCharity*100>toPay && toCharity*2<toPay);
+        
+        //sending the money
+        (bool sent1, bytes memory data1) = toAddress.call{value: toPay}("");
+        require(sent1, "Failed to send Ether");
+        
+        (bool sent2, bytes memory data2) = charities[charityIndex].call{value: toCharity}("");
+        require(sent2, "Failed to send Ether");
+
+	// update total wei, check if high score
+        totalWeiDonated = toCharity + totalWeiDonated;
+        if (toCharity>maxDonationWei) {
+            maxDonationWei = toCharity;
+            maxDonator = msg.sender;
+            emit DonationHighScore(msg.sender, toCharity);
+        }
+    }
+
+    // self-destruct, only runs if owner invokes it
+    function finalize() public {
+        if (msg.sender==owner) {
+            selfdestruct(payable(owner));
+        }
+    }
+}
