@@ -74,8 +74,8 @@ def main(p2sh_address, block_height, private_key, to_p2pkh_addr):
     
     signed_tx = tx.serialize()
 
-    # Generate some more blocks
-    proxy.generatetoaddress(100, p2pkh_addr.to_string())
+    # Generate some more blocks, uncomment to run in regtest
+    #proxy.generatetoaddress(100, p2pkh_addr.to_string())
 
     # print raw signed transaction ready to be broadcasted
     print("Raw signed transaction:\n" + signed_tx)
